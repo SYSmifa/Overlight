@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['www/**', 'capacitor.config.json', 'package.json', 'scripts/**', '.github/workflows/android-apk.yml']
+    paths: ['www/**', 'capacitor.config.json', 'package.json', 'scripts/**', 'icon/**', '.github/workflows/android-apk.yml']
 
 jobs:
   apk:

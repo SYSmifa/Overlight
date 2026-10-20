@@ -13,6 +13,12 @@ MAN=$APP/AndroidManifest.xml
 # orizzontale fisso (sensore: entrambi i versi)
 grep -q 'screenOrientation' "$MAN" || sed -i 's#<activity#<activity android:screenOrientation="sensorLandscape"#' "$MAN"
 
+# Icona dell'app: sostituisce le icone predefinite di Capacitor con quelle in icon/android-res
+RES=$APP/res
+find "$RES" -name 'ic_launcher*' -type f -delete
+rm -f "$RES"/drawable*/ic_launcher_foreground.xml "$RES"/values/ic_launcher_background.xml
+cp -r icon/android-res/. "$RES"/
+
 # MainActivity: schermo intero immersivo + contenuto sotto il notch
 PKG_DIR=$(dirname "$(find "$APP/java" -name MainActivity.java | head -1)")
 PKG=$(echo "${PKG_DIR#$APP/java/}" | tr '/' '.')
