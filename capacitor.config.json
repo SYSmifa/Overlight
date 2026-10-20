@@ -1,0 +1,9 @@
+{
+  "appId": "com.sysmifa.overlight",
+  "appName": "Overlight",
+  "webDir": "www",
+  "backgroundColor": "#000000",
+  "android": {
+    "allowMixedContent": false
+  }
+}
