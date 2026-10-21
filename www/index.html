@@ -80,6 +80,7 @@ function pgPlay(on) { if (on === pgPlaying) return; pgPlaying = on; pgMsg(on ? '
 const SAVE_KEYS = ['overlight_save', 'overlight_best', 'overlight_muted'];
 const store = {
   mem: {},
+  ready: false,   // 21/10: on Playgama nothing is written until the saves have really been read (a failed read must never overwrite a good save with an empty one)
   get(k, d) {
     if (k in this.mem) return this.mem[k] === null || this.mem[k] === undefined ? d : this.mem[k];
     if (PG.on) return d;
@@ -87,7 +88,7 @@ const store = {
   },
   set(k, v) {
     v = String(v); this.mem[k] = v;
-    if (PG.on) { try { const r = window.bridge.storage.set([k], [v]); if (r && r.catch) r.catch(() => {}); } catch (e) {} }
+    if (PG.on) { if (!this.ready) return; try { const r = window.bridge.storage.set([k], [v]); if (r && r.catch) r.catch(() => {}); } catch (e) {} }
     else { try { localStorage.setItem(k, v); } catch (e) {} }
   }
 };
@@ -2435,7 +2436,7 @@ function step(rdt) {
   updateWeaponDrop(dt);
 
   ultProgress();
-  if (tut) updateTutorial(dt);
+  if (tut) updateTutorial(dt); else updateHints(dt);
   if (state === 'wave' && !tut) {
     spawnTimer -= dt;
     const mineMarks = markers.some(m => m.kind !== 'rock');
@@ -4667,6 +4668,7 @@ const ECON = { killDiv: 7, waveBase: 40, wavePer: 10, boss: 300, victory: 3000 }
 function waveReward(w) { return ECON.waveBase + ECON.wavePer * w; }
 function creditRun(victory) {
   if (tut) { run.coins = 0; run.lastEarned = 0; return 0; }   // the tutorial pays nothing
+  profile.played = 1;   // 21/10: a real run is over (the shop tour can start)
   const top = Math.max(run.maxWave, wave);
   let waveBonus = 0; for (let w = run.paidWave + 1; w <= top; w++) waveBonus += waveReward(w);
   run.paidWave = Math.max(run.paidWave, top);
@@ -4767,7 +4769,6 @@ const AM = (() => {
       am.canAds = !!(i && i.canRequestAds);
       dbg += am.canAds ? ' ADS OK' : ' NO ADS';
     } catch (e) { dbg = 'CONSENT ERROR ' + ((e && (e.message || e.code)) || e); }
-    if (TESTING) setTimeout(() => { notice = { text: dbg.toUpperCase().slice(0, 60), t: 8 }; }, 1500);   // test build only: shows what the consent check found
     if (!am.canAds) return;
     try { await P.initialize({}); } catch (e) { am.canAds = false; return; }
     load('inter'); load('rew');
@@ -5931,7 +5932,7 @@ function drawMenuFs() {
 function drawMenu() {
   dim(0.66);
   drawCoinsTop();
-  if (menu.screen === 'shop') { if (!profile.shopTutDone && !shopTut && !tut) startShopTut(); drawShop(); drawShopTut(); return; }
+  if (menu.screen === 'shop') { if (!profile.shopTutDone && !shopTut && !tut && hasPlayed()) startShopTut(); drawShop(); drawShopTut(); return; }   // 21/10: the shop tour only after the first run
   if (menu.screen === 'diff') { drawDiffSelect(); return; }
   if (menu.screen === 'lb') { if (!LB.button()) menu.screen = 'main'; else { drawLeaderboard(); return; } }
   if (menu.screen === 'lang') { drawLangSelect(); return; }
@@ -5943,6 +5944,8 @@ function drawMenu() {
   const bw = Math.min(FS * 13, availW * 0.6), bh = FS * 2.6, gap = FS * 0.8, by = y1 + ts * 0.95 + FS * 1.8;
   uiButton(CX - bw / 2, by, bw, bh, 'PLAY', C.cyan, () => { menu.screen = 'diff'; menu.pick = -1; }, { primary: true, size: FS * 1.2 });
   uiButton(CX - bw / 2, by + bh + gap, bw, UI.h(), 'SHOP', C.mag, () => { menu.screen = 'shop'; }, { size: FS * 0.95 }); tutR.shop = [CX - bw / 2, by + bh + gap, bw, UI.h()]; tutR.half = bw / 2;
+  if (!profile.shopTutDone && hasPlayed()) { const r = Math.max(4, FS * 0.32), bx = CX + bw / 2 - r * 0.4, byy = by + bh + gap + r * 0.4, a = 0.55 + 0.45 * Math.sin(T * 6);   // 21/10: something new in the shop (the free weapon of the tour)
+    fillDot(bx, byy, r * 2.2, C.yel, 0.25 * a); fillDot(bx, byy, r, C.yel, 0.6 + 0.4 * a); fillDot(bx, byy, r * 0.45, C.white, 0.9); }
   uiButton(CX - bw / 2, by + bh + gap * 2 + UI.h(), bw, UI.h(), 'TUTORIAL', C.uiBlue, () => startTutorial(false), { size: FS * 0.95 });
   // 18/10: the language choice, under the tutorial (it was a small button that cycled through the languages)
   if (LB.button()) {   // 19/10: the leaderboard shares the row with the languages
@@ -6291,6 +6294,32 @@ function endTutorial(finished) {
   if (finished && bootReady) { tut = null; profile.tutDone = 1; saveProfile(); freeRun = false; startRun(0, 1); return; }
   toMenu();
   void finished;   // the shop tour now starts the first time the shop is opened
+}
+/* 21/10: the first run of a new player: how to move, then how to aim and fire (the tutorial's own words), without stopping the game.
+   Gone for good once done; never for players who saw the tutorial */
+let hint = null;
+const hasPlayed = () => !!(profile.played || profile.tutDone || profile.best.some(b => b > 0));
+const hintsOn = () => !profile.hintsDone && !profile.tutDone && !tut;
+function updateHints(dt) {
+  if (!hintsOn() || !player.alive || paused || !(state === 'select' || state === 'wave')) return;
+  if (!hint) hint = { k: 0, p: { nx: player.nx, ny: player.ny, nz: player.nz }, d: 0, f: 0, ok: 0 };
+  if (hint.ok > 0) { hint.ok -= dt; if (hint.ok <= 0) { hint.k++; if (hint.k >= 2) { profile.hintsDone = 1; saveProfile(); } } return; }
+  if (hint.k === 0) {
+    hint.d += chord(player, hint.p); hint.p.nx = player.nx; hint.p.ny = player.ny; hint.p.nz = player.nz;
+    if (hint.d > 300 || (state === 'wave' && weapon)) hint.ok = 0.7;
+  } else if (state === 'wave' && weapon) { hint.f += fireHeld ? dt : 0; if (hint.f > 1.3) hint.ok = 0.7; }
+}
+function drawHints() {
+  if (!hint || !hintsOn() || paused || hint.k >= 2 || !(state === 'select' || state === 'wave')) return;
+  if (hint.k === 1 && !(state === 'wave' && weapon && !banner) && hint.ok <= 0) return;   // aim and fire: once a weapon is in hand and the WAVE 1 banner has gone
+  const st = TUT_STEPS[hint.k === 0 ? 1 : 3], ok = hint.ok > 0;
+  const y0 = safe.t + (compact ? FS * 1.1 : FS * 4.4), tS = Math.min(FS * 1.5, availW * 0.06), lS = Math.max(9, FS * 0.68);
+  const lines = ok ? [] : st.lines().filter(Boolean).concat(hint.k === 0 && state === 'select' && pickups.length ? ['FLY ONTO A WEAPON TO BEGIN'] : []), w = Math.min(availW * 0.86, FS * 30);
+  const h = tS * 1.6 + lines.length * lS * 1.9 + FS * 0.6, a = Math.min(1, ok ? hint.ok / 0.35 : 1);
+  { const g = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = 'rgba(2,3,12,' + (0.8 * a).toFixed(3) + ')'; ctx.fillRect(CX - w / 2, y0 - FS * 0.6, w, h); ctx.globalCompositeOperation = g; }
+  const ty = y0 + tS * 0.6, tTxt = ok ? 'NICE!' : st.title;
+  vtext(tTxt, CX, ty, Math.min(tS, w * 0.9 / Math.max(1, textW(tTxt, 1, 0.12))), ok ? C.green : C.yel, { track: 0.12, hot: false, alpha: a });
+  lines.forEach((l, i) => uiInfo(l, CX, ty + tS * 0.9 + FS * 0.4 + i * lS * 1.9, C.white, { size: lS, maxW: w * 0.9, alpha: 0.88 }));
 }
 function exitAllTutorials() { if (tut) endTutorial(false); else if (shopTut) endShopTut(); }
 function drawTutExit(x, y) {   // top left, where the score usually is
@@ -10531,7 +10560,7 @@ function drawBanner() {
   if (banner.sub) vtext(banner.sub, CX, y + size * 0.6 + FS * 1.3, FS * 0.9, C.yel, { alpha: a, track: 0.18, hot: false });
 }
 function drawSelectPrompt() {
-  if (state !== 'select' || !pickups.length || tut) return;
+  if (state !== 'select' || !pickups.length || tut || (hint && hintsOn() && hint.k === 0)) return;   // 21/10: the MOVE hint says it
   const y = CY - Math.min(RS * 0.82, availH * 0.42);
   const msg = 'FLY ONTO A WEAPON TO BEGIN';
   vtext(msg, CX, y, FS * 0.8, C.white, { alpha: 0.55 + 0.35 * Math.sin(T * 4), track: 0.14, hot: false });
@@ -10639,7 +10668,7 @@ function render() {
   drawShipPost();   // the ship's matt white body
   if (!menuState) {
     drawEnemyShotsTop();
-    uiCrisp = true; drawHudBands(); drawBanner(); drawSelectPrompt(); drawHUD(); drawTutorial(); uiCrisp = false;
+    uiCrisp = true; drawHudBands(); drawBanner(); drawSelectPrompt(); drawHUD(); drawTutorial(); drawHints(); uiCrisp = false;
     drawBossBar();
   }
   uiCrisp = true;
@@ -10814,9 +10843,17 @@ function initPlatform() {
   }).catch(() => false);
 }
 function loadSaves() {
+  // 21/10: ask the browser to keep this site's data (some phones clear it); never on Firefox, which would show a permission prompt
+  try { if (navigator.storage && navigator.storage.persist && !/Firefox/i.test(navigator.userAgent || '')) navigator.storage.persist().catch(() => {}); } catch (e) {}
   if (!PG.on) return Promise.resolve();
-  let q; try { q = window.bridge.storage.get(SAVE_KEYS); } catch (e) { return Promise.resolve(); }
-  return Promise.resolve(q).then(d => {
+  // 21/10: the read is tried up to 3 times (4 s each); if it never works, the game runs but saves nothing this session
+  const once = () => new Promise((ok, no) => {
+    let q; try { q = window.bridge.storage.get(SAVE_KEYS); } catch (e) { no(e); return; }
+    const tm = setTimeout(() => no(new Error('timeout')), 4000);
+    Promise.resolve(q).then(d => { clearTimeout(tm); ok(d); }, e => { clearTimeout(tm); no(e); });
+  });
+  const tryN = n => once().catch(e => n > 1 ? new Promise(r => setTimeout(r, 800)).then(() => tryN(n - 1)) : Promise.reject(e));
+  return tryN(3).then(d => {
     const arr = Array.isArray(d) ? d : [d];
     SAVE_KEYS.forEach((k, i) => { let v = arr[i]; if (v !== null && v !== undefined && typeof v !== 'string') v = JSON.stringify(v); store.mem[k] = v === undefined ? null : v; });
     // the saves arrived: everything read at start-up is read again
@@ -10824,6 +10861,7 @@ function loadSaves() {
     best = parseInt(store.get('overlight_best', '0'), 10) || 0;
     muted = store.get('overlight_muted', '0') === '1';
     diffIdx = clamp(profile.diff | 0, 0, 3); DIFF = DIFFS[diffIdx];
+    store.ready = true;
   }).catch(() => {});
 }
 if (AM.start) AM.start();   // app only: consent form + AdMob start
@@ -10831,7 +10869,7 @@ initPlatform().then(loadSaves).catch(() => {}).then(() => {
   bootReady = true;
   initLang();
   syncAudio();
-  if (!profile.tutDone && state === 'title') startTutorial(true);   // the very first time: straight into the tutorial
+  // 21/10: the tutorial no longer starts by itself: the first launch opens on the menu (TUTORIAL is a button there); the first run shows how to move and fire (hints)
   requestAnimationFrame(() => requestAnimationFrame(() => pgMsg('game_ready')));   // the first playable frame is on screen
 });
 })();

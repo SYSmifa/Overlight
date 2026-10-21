@@ -57,7 +57,6 @@ const AM = (() => {
       am.canAds = !!(i && i.canRequestAds);
       dbg += am.canAds ? ' ADS OK' : ' NO ADS';
     } catch (e) { dbg = 'CONSENT ERROR ' + ((e && (e.message || e.code)) || e); }
-    if (TESTING) setTimeout(() => { notice = { text: dbg.toUpperCase().slice(0, 60), t: 8 }; }, 1500);   // test build only: shows what the consent check found
     if (!am.canAds) return;
     try { await P.initialize({}); } catch (e) { am.canAds = false; return; }
     load('inter'); load('rew');
