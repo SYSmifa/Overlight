@@ -4758,12 +4758,16 @@ const AM = (() => {
     showInterstitial() { show('inter'); }, showRewarded() { show('rew'); } } };
   /* at start-up: ask for consent when the region needs it (EEA / UK), then start the SDK and load the first ads */
   am.start = async () => {
+    let dbg = '';
     try {
       let i = await P.requestConsentInfo({ tagForUnderAgeOfConsent: false });
-      if (i && i.isConsentFormAvailable && i.status === 'REQUIRED') i = await P.showConsentForm();
+      dbg = 'CONSENT ' + (i && i.status) + (i && i.isConsentFormAvailable ? ' FORM' : ' NOFORM');
+      if (i && i.isConsentFormAvailable && i.status === 'REQUIRED') { i = await P.showConsentForm(); dbg += ' > ' + (i && i.status); }
       am.privacy = !!i && i.privacyOptionsRequirementStatus === 'REQUIRED';
       am.canAds = !!(i && i.canRequestAds);
-    } catch (e) {}
+      dbg += am.canAds ? ' ADS OK' : ' NO ADS';
+    } catch (e) { dbg = 'CONSENT ERROR ' + ((e && (e.message || e.code)) || e); }
+    if (TESTING) setTimeout(() => { notice = { text: dbg.toUpperCase().slice(0, 60), t: 8 }; }, 1500);   // test build only: shows what the consent check found
     if (!am.canAds) return;
     try { await P.initialize({}); } catch (e) { am.canAds = false; return; }
     load('inter'); load('rew');

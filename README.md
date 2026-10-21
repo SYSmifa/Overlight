@@ -12,3 +12,8 @@ Versione app (Capacitor) del gioco Overlight. Il gioco è un unico file HTML in 
 - Pubblicità: nell'app il Bridge non c'è, quindi il video premiato è ancora simulato. AdMob (solo ID di test) è il passo successivo.
 - Classifiche: nascoste (il pulsante compare solo se il Bridge le supporta): da verificare sul telefono.
 - Da verificare su telefono vero: notch/aree sicure, salvataggi (localStorage), audio, controlli a due levette.
+
+## Aggiornare il gioco nell'app
+1. Sostituisci `game/index.html` con la nuova versione **release** del gioco (la stessa di Playgama).
+2. Fai il push: la build rigenera `www/index.html` da sola con `scripts/build-www.py`, rimettendo le modifiche dell'app (AdMob, consenso, niente Playgama). Se il gioco ha cambiato uno dei punti toccati, la build si ferma con un messaggio che dice quale.
+3. Le modifiche specifiche dell'app (pubblicità, consenso) stanno in `app/admob-block.js`.

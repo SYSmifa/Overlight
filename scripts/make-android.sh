@@ -4,6 +4,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# gioco per l'app = release del gioco (game/index.html) + modifiche dell'app (app/admob-block.js)
+python3 scripts/build-www.py game/index.html www/index.html
+
 npm install
 [ -d android ] || npx cap add android
 npx cap sync android
