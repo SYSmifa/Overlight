@@ -13,6 +13,10 @@ MAN=$APP/AndroidManifest.xml
 # orizzontale fisso (sensore: entrambi i versi)
 grep -q 'screenOrientation' "$MAN" || sed -i 's#<activity#<activity android:screenOrientation="sensorLandscape"#' "$MAN"
 
+# AdMob: App ID di Overlight nel manifest (obbligatorio, altrimenti l'app si chiude all'avvio)
+grep -q 'com.google.android.gms.ads.APPLICATION_ID' "$MAN" || sed -i 's#</application>#    <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-6445940059153239~2146036708"/>\n    </application>#' "$MAN"
+grep -q 'ca-app-pub-6445940059153239~2146036708' "$MAN" || { echo "ERRORE: App ID AdMob non inserito nel manifest"; exit 1; }
+
 # Icona dell'app: sostituisce le icone predefinite di Capacitor con quelle in icon/android-res
 RES=$APP/res
 find "$RES" -name 'ic_launcher*' -type f -delete
