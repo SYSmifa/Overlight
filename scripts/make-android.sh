@@ -10,6 +10,7 @@ python3 scripts/build-www.py game/index.html www/index.html
 npm install
 [ -d android ] || npx cap add android
 npx cap sync android
+python3 scripts/patch-gradle.py   # API 36, versione e firma per Google Play
 
 APP=android/app/src/main
 MAN=$APP/AndroidManifest.xml
