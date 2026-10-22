@@ -10,7 +10,7 @@ Se il gioco e' cambiato proprio in uno dei punti toccati, lo script si ferma e d
 import re, sys
 src, dst = sys.argv[1], sys.argv[2]
 s = open(src, encoding='utf-8').read()
-block = open('app/admob-block.js', encoding='utf-8').read()
+block = open('app/admob-block.js', encoding='utf-8').read() + open('app/splash-block.js', encoding='utf-8').read()
 
 def once(text, old, new, what):
     if text.count(old) != 1:
@@ -37,6 +37,9 @@ new = """  } else if (AM.privacy) {   // the app, in a region that asks for it (
 s = once(s, old, new, 'pulsante LANGUAGES del menu')
 s = once(s, "initPlatform().then(loadSaves).catch(() => {}).then(() => {",
          "if (AM.start) AM.start();   // app only: consent form + AdMob start\ninitPlatform().then(loadSaves).catch(() => {}).then(() => {", 'avvio piattaforma')
+# 6. splash (OVERLIGHT + logo studio) prima del menu
+s = once(s, "if (state === 'title') { if (bootReady) drawMenu(); else vtext('LOADING...'",
+         "if (state === 'title') { if (SPLASH.on()) SPLASH.draw(); else if (bootReady) drawMenu(); else vtext('LOADING...'", 'disegno del menu')
 # 7. annunci reali solo se richiesto (OVERLIGHT_LIVE_ADS=1, build da pubblicare); altrimenti solo annunci di test
 import os
 if os.environ.get('OVERLIGHT_LIVE_ADS') == '1':

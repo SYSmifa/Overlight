@@ -64,9 +64,11 @@ const AM = (() => {
     showInterstitial() { show('inter'); }, showRewarded() { show('rew'); } } };
   /* at start-up: ask for consent when the region needs it (EEA / UK), then start the SDK and load the first ads */
   am.start = async () => {
-    // Asking for consent while the game is starting makes it crawl on some phones (10-15 fps instead of 65):
-    // tested, the same call 20 s later is harmless. So wait until the game is up and settled.
-    await new Promise(r => setTimeout(r, 20000));
+    // Asking for consent while the game is starting made it crawl on some phones (10-15 fps instead of 65); the same call
+    // 20 s later is harmless. So it waits for the splash to end (menu on screen), then a short margin (CONSENT_MARGIN).
+    const CONSENT_MARGIN = 3000;
+    for (let i = 0; i < 150 && !window.__splashDone; i++) await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, CONSENT_MARGIN));
     let dbg = '';
     try {
       let i = await P.requestConsentInfo({ tagForUnderAgeOfConsent: false });
