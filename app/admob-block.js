@@ -64,20 +64,20 @@ const AM = (() => {
     showInterstitial() { show('inter'); }, showRewarded() { show('rew'); } } };
   /* at start-up: ask for consent when the region needs it (EEA / UK), then start the SDK and load the first ads */
   am.start = async () => {
-    // Asking for consent while the game is starting made it crawl on some phones (10-15 fps instead of 65); the same call
-    // 20 s later is harmless. So it waits for the splash to end (menu on screen), then a short margin (CONSENT_MARGIN).
-    const CONSENT_MARGIN = 3000;
-    for (let i = 0; i < 150 && !window.__splashDone; i++) await new Promise(r => setTimeout(r, 200));
-    await new Promise(r => setTimeout(r, CONSENT_MARGIN));
+    // Asking for consent the very moment the game boots made it crawl on some phones (10-15 fps instead of 65). The splash screen
+    // covers that moment: the consent starts a second after it, the splash waits for it (window.__consentDone) and then shows the menu.
+    const CONSENT_DELAY = 1000;
+    await new Promise(r => setTimeout(r, CONSENT_DELAY));
     let dbg = '';
     try {
       let i = await P.requestConsentInfo({ tagForUnderAgeOfConsent: false });
       dbg = 'CONSENT ' + (i && i.status) + (i && i.isConsentFormAvailable ? ' FORM' : ' NOFORM');
-      if (i && i.isConsentFormAvailable && i.status === 'REQUIRED') { i = await P.showConsentForm(); dbg += ' > ' + (i && i.status); }
+      if (i && i.isConsentFormAvailable && i.status === 'REQUIRED') { window.__consentForm = true; try { i = await P.showConsentForm(); } finally { window.__consentForm = false; } dbg += ' > ' + (i && i.status); }
       am.privacy = !!i && i.privacyOptionsRequirementStatus === 'REQUIRED';
       am.canAds = !!(i && i.canRequestAds);
       dbg += am.canAds ? ' ADS OK' : ' NO ADS';
     } catch (e) { dbg = 'CONSENT ERROR ' + ((e && (e.message || e.code)) || e); }
+    window.__consentDone = true;   // the splash can go
     if (!am.canAds) return;
     try { await P.initialize({}); } catch (e) { am.canAds = false; return; }
     load('inter'); load('rew');
