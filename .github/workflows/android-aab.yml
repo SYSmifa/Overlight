@@ -64,32 +64,27 @@ jobs:
         with:
           name: ${{ env.SIGNED != '1' && 'overlight-aab-NON-FIRMATO' || (inputs.debuggable && 'overlight-aab-DEBUGGABLE-NON-CARICARE' || 'overlight-release-aab') }}
           path: android/app/build/outputs/bundle/release/app-release.aab
-      - name: Prove A e B (solo se richieste)
+      - name: Prove C e D (solo se richieste)
         if: ${{ inputs.experiments }}
         working-directory: android
         run: |
           ASSETS=app/src/main/assets
           mkdir -p ../variants
-          cp $ASSETS/capacitor.config.json /tmp/capacitor.config.orig.json
           cp $ASSETS/public/index.html /tmp/index.orig.html
-          # A: debug del contenuto web attivo (come in una app debuggable), app NON debuggable
-          python3 - <<'PY'
-          import json
-          p = 'app/src/main/assets/capacitor.config.json'
-          c = json.load(open(p)); c.setdefault('android', {})['webContentsDebuggingEnabled'] = True
-          json.dump(c, open(p, 'w'))
-          PY
+          # C: solo consenso (niente initialize, niente caricamento annunci)
+          grep -q "try { await P.initialize({}); }" $ASSETS/public/index.html
+          sed -i "s#try { await P.initialize({}); }#return; try { await P.initialize({}); }#" $ASSETS/public/index.html
           ./gradlew assembleRelease --no-daemon
-          cp app/build/outputs/apk/release/*.apk ../variants/A-webdebug.apk
-          cp /tmp/capacitor.config.orig.json $ASSETS/capacitor.config.json
-          # B: niente AdMob (ne' consenso ne' annunci), app NON debuggable
-          grep -q 'if (AM.start) AM.start();' $ASSETS/public/index.html
-          sed -i 's#if (AM.start) AM.start();##' $ASSETS/public/index.html
+          cp app/build/outputs/apk/release/*.apk ../variants/C-solo-consenso.apk
+          cp /tmp/index.orig.html $ASSETS/public/index.html
+          # D: consenso + initialize, senza caricare gli annunci
+          grep -q "load('inter'); load('rew');" $ASSETS/public/index.html
+          sed -i "s#^    load('inter'); load('rew');#    return;#" $ASSETS/public/index.html
           ./gradlew assembleRelease --no-daemon
-          cp app/build/outputs/apk/release/*.apk ../variants/B-noads.apk
+          cp app/build/outputs/apk/release/*.apk ../variants/D-initialize.apk
           cp /tmp/index.orig.html $ASSETS/public/index.html
       - uses: actions/upload-artifact@v4
         if: ${{ inputs.experiments }}
         with:
-          name: overlight-prove-A-B
+          name: overlight-prove-C-D
           path: variants/*.apk
