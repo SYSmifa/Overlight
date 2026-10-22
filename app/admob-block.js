@@ -64,6 +64,9 @@ const AM = (() => {
     showInterstitial() { show('inter'); }, showRewarded() { show('rew'); } } };
   /* at start-up: ask for consent when the region needs it (EEA / UK), then start the SDK and load the first ads */
   am.start = async () => {
+    // Asking for consent while the game is starting makes it crawl on some phones (10-15 fps instead of 65):
+    // tested, the same call 20 s later is harmless. So wait until the game is up and settled.
+    await new Promise(r => setTimeout(r, 20000));
     let dbg = '';
     try {
       let i = await P.requestConsentInfo({ tagForUnderAgeOfConsent: false });
