@@ -64,27 +64,29 @@ jobs:
         with:
           name: ${{ env.SIGNED != '1' && 'overlight-aab-NON-FIRMATO' || (inputs.debuggable && 'overlight-aab-DEBUGGABLE-NON-CARICARE' || 'overlight-release-aab') }}
           path: android/app/build/outputs/bundle/release/app-release.aab
-      - name: Prove C e D (solo se richieste)
+      - name: Prove E e F (solo se richieste)
         if: ${{ inputs.experiments }}
         working-directory: android
         run: |
           ASSETS=app/src/main/assets
           mkdir -p ../variants
           cp $ASSETS/public/index.html /tmp/index.orig.html
-          # C: solo consenso (niente initialize, niente caricamento annunci)
-          grep -q "try { await P.initialize({}); }" $ASSETS/public/index.html
           sed -i "s#try { await P.initialize({}); }#return; try { await P.initialize({}); }#" $ASSETS/public/index.html
+          cp $ASSETS/public/index.html /tmp/index.base.html
+          # E: solo requestConsentInfo, senza mai mostrare il modulo
+          grep -q "i.status === 'REQUIRED') {" $ASSETS/public/index.html
+          sed -i "s#i.status === 'REQUIRED') {#i.status === 'REQUIRED' \&\& false) {#" $ASSETS/public/index.html
           ./gradlew assembleRelease --no-daemon
-          cp app/build/outputs/apk/release/*.apk ../variants/C-solo-consenso.apk
-          cp /tmp/index.orig.html $ASSETS/public/index.html
-          # D: consenso + initialize, senza caricare gli annunci
-          grep -q "load('inter'); load('rew');" $ASSETS/public/index.html
-          sed -i "s#^    load('inter'); load('rew');#    return;#" $ASSETS/public/index.html
+          cp app/build/outputs/apk/release/*.apk ../variants/E-solo-richiesta-info.apk
+          cp /tmp/index.base.html $ASSETS/public/index.html
+          # F: consenso come C ma partenza ritardata di 20 secondi
+          grep -q "am.start = async () => {" $ASSETS/public/index.html
+          sed -i "s#am.start = async () => {#am.start = async () => { await new Promise(r => setTimeout(r, 20000));#" $ASSETS/public/index.html
           ./gradlew assembleRelease --no-daemon
-          cp app/build/outputs/apk/release/*.apk ../variants/D-initialize.apk
+          cp app/build/outputs/apk/release/*.apk ../variants/F-consenso-dopo-20s.apk
           cp /tmp/index.orig.html $ASSETS/public/index.html
       - uses: actions/upload-artifact@v4
         if: ${{ inputs.experiments }}
         with:
-          name: overlight-prove-C-D
+          name: overlight-prove-E-F
           path: variants/*.apk
