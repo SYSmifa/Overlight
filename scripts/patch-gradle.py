@@ -35,7 +35,7 @@ if 'signingConfigs' not in s:
 '''
     s, n = re.subn(r'([ \t]*)buildTypes\s*\{', lambda m: sc + m.group(0), s, count=1)
     if n != 1: sys.exit("ERRORE patch-gradle: buildTypes non trovato")
-    s, n = re.subn(r'(buildTypes\s*\{\s*release\s*\{)', lambda m: m.group(1) + '\n            if (System.getenv("KEYSTORE_FILE")) { signingConfig signingConfigs.release }', s, count=1)
+    s, n = re.subn(r'(buildTypes\s*\{\s*release\s*\{)', lambda m: m.group(1) + '\n            if (System.getenv("KEYSTORE_FILE")) { signingConfig signingConfigs.release }\n            if (System.getenv("DEBUGGABLE_RELEASE") == "1") { debuggable true }', s, count=1)
     if n != 1: sys.exit("ERRORE patch-gradle: blocco release non trovato")
 open(a, 'w').write(s)
 print("build.gradle pronto (versione, firma)")

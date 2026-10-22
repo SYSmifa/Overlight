@@ -9,6 +9,10 @@ on:
       version_name:
         description: 'Nome della versione'
         default: '1.0'
+      debuggable:
+        description: 'SOLO PROVE: release marcata debuggable (Google Play la rifiuta)'
+        type: boolean
+        default: false
 
 jobs:
   aab:
@@ -16,6 +20,7 @@ jobs:
     env:
       VERSION_CODE: ${{ github.run_number }}
       VERSION_NAME: ${{ inputs.version_name }}
+      DEBUGGABLE_RELEASE: ${{ inputs.debuggable && '1' || '0' }}
       OVERLIGHT_LIVE_ADS: ${{ inputs.live_ads && '1' || '0' }}
       KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
       KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -49,9 +54,9 @@ jobs:
         run: ./gradlew assembleRelease --no-daemon
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.SIGNED == '1' && 'overlight-release-apk' || 'overlight-apk-NON-FIRMATO' }}
+          name: ${{ env.SIGNED != '1' && 'overlight-apk-NON-FIRMATO' || (inputs.debuggable && 'overlight-apk-release-DEBUGGABLE' || 'overlight-release-apk') }}
           path: android/app/build/outputs/apk/release/*.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.SIGNED == '1' && 'overlight-release-aab' || 'overlight-aab-NON-FIRMATO' }}
+          name: ${{ env.SIGNED != '1' && 'overlight-aab-NON-FIRMATO' || (inputs.debuggable && 'overlight-aab-DEBUGGABLE-NON-CARICARE' || 'overlight-release-aab') }}
           path: android/app/build/outputs/bundle/release/app-release.aab
