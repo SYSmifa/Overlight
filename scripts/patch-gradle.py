@@ -37,5 +37,9 @@ if 'signingConfigs' not in s:
     if n != 1: sys.exit("ERRORE patch-gradle: buildTypes non trovato")
     s, n = re.subn(r'(buildTypes\s*\{\s*release\s*\{)', lambda m: m.group(1) + '\n            if (System.getenv("KEYSTORE_FILE")) { signingConfig signingConfigs.release }\n            if (System.getenv("DEBUGGABLE_RELEASE") == "1") { debuggable true }', s, count=1)
     if n != 1: sys.exit("ERRORE patch-gradle: blocco release non trovato")
+# 3) Google Play Games Services (classifiche)
+if 'play-services-games-v2' not in s:
+    s, n = re.subn(r'(\ndependencies\s*\{)', lambda m: m.group(1) + "\n    implementation 'com.google.android.gms:play-services-games-v2:+'", s, count=1)
+    if n != 1: sys.exit("ERRORE patch-gradle: blocco dependencies non trovato")
 open(a, 'w').write(s)
-print("build.gradle pronto (versione, firma)")
+print("build.gradle pronto (versione, firma, Play Games)")

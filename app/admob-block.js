@@ -8,6 +8,10 @@ const AM = (() => {
   try { const c = window.Capacitor; if (c && c.isNativePlatform && c.isNativePlatform()) P = (c.Plugins && c.Plugins.AdMob) || null; } catch (e) {}
   const am = { native: !!P, canAds: false, privacy: false, shim: null };
   if (!P) return am;
+  /* Google Play Games leaderboards (own plugin: android PlayGamesPlugin). Game difficulty id -> leaderboard id in Play Console. */
+  let G = null;
+  try { G = (window.Capacitor.Plugins && window.Capacitor.Plugins.PlayGames) || null; } catch (e) {}
+  const LBID = { normal: 'CgkIh66y9bsSEAIQBA', hard: 'CgkIh66y9bsSEAIQBQ', nightmare: 'CgkIh66y9bsSEAIQBg', overlight: 'CgkIh66y9bsSEAIQBw' };
   if (TESTING) {   // test builds only: a small box with the frame rate and the drawing settings, to hunt slowdowns
     try {
       const el = document.createElement('div');
@@ -61,7 +65,12 @@ const AM = (() => {
   L('onRewardedVideoAdFailedToShow', () => emit('rew', 'failed'));
   am.shim = { EVENT_NAME: ev, advertisement: {
     on(e, f) { if (subs[e]) subs[e].add(f); }, off(e, f) { if (subs[e]) subs[e].delete(f); },
-    showInterstitial() { show('inter'); }, showRewarded() { show('rew'); } } };
+    showInterstitial() { show('inter'); }, showRewarded() { show('rew'); } },
+    leaderboards: G ? {   // the game shows its LEADERBOARD button for 'native_popup' and sends ranked scores with setScore
+      type: 'native_popup',
+      setScore(id, score) { const i = LBID[id]; if (i) try { G.submitScore({ id: i, score: Math.round(score) }).catch(() => {}); } catch (e) {} },
+      showNativePopup(id) { const i = LBID[id]; if (i) try { G.showLeaderboard({ id: i }).catch(() => {}); } catch (e) {} }
+    } : undefined };
   /* at start-up: ask for consent when the region needs it (EEA / UK), then start the SDK and load the first ads */
   am.start = async () => {
     // Asking for consent the very moment the game boots made it crawl on some phones (10-15 fps instead of 65). The splash screen
@@ -78,6 +87,7 @@ const AM = (() => {
       dbg += am.canAds ? ' ADS OK' : ' NO ADS';
     } catch (e) { dbg = 'CONSENT ERROR ' + ((e && (e.message || e.code)) || e); }
     window.__consentDone = true;   // the splash can go
+    if (G) { try { G.signIn().catch(() => {}); } catch (e) {} }   // Play Games sign-in (silent when the player already has a profile)
     if (!am.canAds) return;
     try { await P.initialize({}); } catch (e) { am.canAds = false; return; }
     load('inter'); load('rew');
