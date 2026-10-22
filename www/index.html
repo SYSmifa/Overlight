@@ -4720,6 +4720,22 @@ const AM = (() => {
   try { const c = window.Capacitor; if (c && c.isNativePlatform && c.isNativePlatform()) P = (c.Plugins && c.Plugins.AdMob) || null; } catch (e) {}
   const am = { native: !!P, canAds: false, privacy: false, shim: null };
   if (!P) return am;
+  if (TESTING) {   // test builds only: a small box with the frame rate and the drawing settings, to hunt slowdowns
+    try {
+      const el = document.createElement('div');
+      el.style.cssText = 'position:fixed;left:4px;bottom:4px;z-index:99999;font:11px monospace;color:#0f0;background:rgba(0,0,0,.65);padding:2px 5px;pointer-events:none;white-space:pre';
+      document.body.appendChild(el);
+      let n = 0, t0 = performance.now(), worst = 0, last = t0;
+      const tick = t => { n++; worst = Math.max(worst, t - last); last = t; requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+      setInterval(() => {
+        const now = performance.now(), fps = n * 1000 / (now - t0);
+        let q = ''; try { q = 'q' + quality + ' P' + PCAP + ' dpr' + DPR.toFixed(2) + ' ' + cv.width + 'x' + cv.height; } catch (e) {}
+        el.textContent = fps.toFixed(0) + ' fps  worst ' + worst.toFixed(0) + 'ms  ' + q + '\n' + (navigator.hardwareConcurrency || '?') + ' cores  ' + (navigator.deviceMemory || '?') + 'GB  webview ' + ((/Chrome\/([\d.]+)/.exec(navigator.userAgent) || [])[1] || '?');
+        n = 0; t0 = now; worst = 0;
+      }, 1000);
+    } catch (e) {}
+  }
   const ev = { INTERSTITIAL_STATE_CHANGED: 'inter', REWARDED_STATE_CHANGED: 'rew' };
   const subs = { inter: new Set(), rew: new Set() };
   const emit = (k, s) => {
