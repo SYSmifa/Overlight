@@ -49,7 +49,7 @@ jobs:
         run: ./gradlew assembleRelease --no-daemon
       - uses: actions/upload-artifact@v4
         with:
-          name: overlight-release-apk${{ env.SIGNED == '1' && '' || '-NON-FIRMATO' }}
+          name: ${{ env.SIGNED == '1' && 'overlight-release-apk' || 'overlight-apk-NON-FIRMATO' }}
           path: android/app/build/outputs/apk/release/*.apk
       - uses: actions/upload-artifact@v4
         with:
