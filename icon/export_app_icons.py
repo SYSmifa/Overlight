@@ -16,16 +16,19 @@ S = 1024
 full = src.resize((S, S), Image.LANCZOS)
 
 a = np.asarray(src, float)
-bgl = sum(BG) / 3.0
-alpha = np.clip((a.mean(axis=2) - bgl) / (255 - bgl), 0, 1)
+# symbol = everything that is not the background; it keeps its own colours (cyan ring, white ship, magenta trails)
+bgarr = np.array(BG, float)
+dist = np.abs(a - bgarr).max(axis=2)
+alpha = np.clip(dist / 120.0, 0, 1)
 ys, xs = np.where(alpha > 0.5)
 x0, x1, y0, y1 = xs.min(), xs.max(), ys.min(), ys.max()
 cx, cy, d = (x0 + x1) / 2, (y0 + y1) / 2, max(x1 - x0, y1 - y0)
-sym = Image.fromarray((alpha * 255).astype(np.uint8), 'L')
+al = alpha[..., None]
+rgb = np.clip((a - (1 - al) * bgarr) / np.maximum(al, 1e-3), 0, 255)
+sym = Image.fromarray(np.dstack([rgb, alpha * 255]).astype(np.uint8), 'RGBA')
 side = d / SAFE
 box = (int(cx - side / 2), int(cy - side / 2), int(cx + side / 2), int(cy + side / 2))
-sym = sym.crop(box).resize((S, S), Image.LANCZOS)
-fg = Image.new('RGBA', (S, S), (255, 255, 255, 0)); fg.putalpha(sym)
+fg = sym.crop(box).resize((S, S), Image.LANCZOS)
 bg = Image.new('RGB', (S, S), BG)
 comp = bg.convert('RGBA'); comp.alpha_composite(fg)
 
