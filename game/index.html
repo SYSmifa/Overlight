@@ -832,7 +832,7 @@ let lancers = [], lancersLeft = 0;              // spear ships that charge and d
 let bonus = null, bonusTimer = 25, speedT = 0, shield = false;   // power-ups
 /* weapon pickups during the game: each weapon keeps its own level and progress bar */
 let wdrops = [], wdropTimer = 12, barShown = 0, wPowCD = {};   // wPowCD: 19/10, seconds before a weapon's power-up can show up again after you took one
-const POW_CD = 20;   // weapon drops: at most one per weapon on the map
+const POW_CD = 10;   // weapon drops: at most one per weapon on the map
 const wlv = { flame: 1, ice: 1, orb: 1 }, wprog = { flame: 0, ice: 0, orb: 0 };
 const MAXLV = 5;
 const needFor = lv => lv + 2;   // pickups to reach the next level: 3, 4, 5, 6
@@ -1208,7 +1208,10 @@ function collectWeapon(k) {
       floatText(player, 'RESERVE +1', col, FS * 1.1);
     } else { score += 250; floatText(player, '+250', C.yel, FS * 1.0); }
   } else {
-    weapon = k; wlevel = wlv[k];
+    const prevLv = wlv[weapon];
+    weapon = k;
+    if (wlv[k] < prevLv - 1) { wlv[k] = prevLv - 1; wprog[k] = 0; }   // 23/10: a weapon you switch to starts at most one level below the one you were using
+    wlevel = wlv[k];
     floatText(player, WEAPONS[k].name, col, FS * 1.1);
   }
   fireCD = 0.1;
@@ -1755,6 +1758,8 @@ function hitPlayer(dmg) {
   } else player.inv = 2.5;
 }
 function gameOver() {
+  tipK = nextTip(tipK);
+  if (!tut) { retryFree = firstDeathFree; firstDeathFree = false; }
   setState('over'); pgLevel('level_failed'); pgPlay(false);
   newBest = false; creditRun(false);
   if (score > best) { best = score; store.set('overlight_best', best); }
@@ -4451,6 +4456,15 @@ const I18N = {
   'TOTAL #': ['GESAMT #', 'TOTAL #', 'TOTALE #', 'TOTAL #', 'TOTAL #', 'ВСЕГО #', 'TOPLAM #'],
   'DOUBLED - TOTAL #': ['VERDOPPELT - GESAMT #', 'DOUBLÉ - TOTAL #', 'RADDOPPIATO - TOTALE #', 'DOBRADO - TOTAL #', 'DUPLICADO - TOTAL #', 'УДВОЕНО - ВСЕГО #', 'İKİYE KATLANDI - TOPLAM #'],
   'DOUBLE COINS': ['MÜNZEN VERDOPPELN', 'DOUBLER LES PIÈCES', 'RADDOPPIA LE MONETE', 'DOBRAR MOEDAS', 'DUPLICAR MONEDAS', 'УДВОИТЬ МОНЕТЫ', 'PARAYI İKİYE KATLA'],
+  // 23/10: GAME OVER: free weapon button and tips
+  'FREE WEAPON': ['GRATIS-WAFFE', 'ARME GRATUITE', 'ARMA GRATIS', 'ARMA GRÁTIS', 'ARMA GRATIS', 'БЕСПЛАТНОЕ ОРУЖИЕ', 'BEDAVA SİLAH'],
+  'IN THE SHOP': ['IM SHOP', 'DANS LA BOUTIQUE', 'NEL NEGOZIO', 'NA LOJA', 'EN LA TIENDA', 'В МАГАЗИНЕ', 'MAĞAZADA'],
+  'GRAB A CRATE OF YOUR OWN WEAPON TO LEVEL IT UP': ['NIMM EINE KISTE DEINER EIGENEN WAFFE FÜR EIN LEVEL UP', 'PRENDS UNE CAISSE DE TA PROPRE ARME POUR UN LEVEL UP', 'PRENDI UNA CASSA DELLA TUA ARMA PER FARLE FARE LEVEL UP', 'PEGUE UMA CAIXA DA SUA PRÓPRIA ARMA PARA UM LEVEL UP', 'COGE UNA CAJA DE TU PROPIA ARMA PARA UN LEVEL UP', 'ПОДБЕРИ ЯЩИК СВОЕГО ОРУЖИЯ, ЧТОБЫ ПОВЫСИТЬ УРОВЕНЬ', 'SEVİYE ATLATMAK İÇİN KENDİ SİLAHININ KUTUSUNU AL'],
+  'YOUR ULTIMATE CHARGES AS YOU FIGHT - USE IT ON A CROWD': ['DEINE ULTIMATE LÄDT IM KAMPF - SETZ SIE GEGEN EINE MENGE EIN', 'TON ULTIME SE CHARGE EN COMBATTANT - UTILISE-LE SUR LA FOULE', "L'ULTIMATE SI CARICA COMBATTENDO - USALA QUANDO SONO IN TANTI", 'SEU ULTIMATE CARREGA LUTANDO - USE NUMA MULTIDÃO', 'TU ULTIMATE SE CARGA AL LUCHAR - ÚSALA CONTRA UNA MULTITUD', 'УЛЬТА ЗАРЯЖАЕТСЯ В БОЮ - ПРИМЕНЯЙ ЕЕ ПРОТИВ ТОЛПЫ', 'ULTIMATE SAVAŞTIKÇA DOLAR - KALABALIĞA KARŞI KULLAN'],
+  'SHOOT THE ASTEROIDS - THEY CAN HIDE CRATES AND BONUSES': ['SCHIESS AUF ASTEROIDEN - SIE KÖNNEN KISTEN UND BONI VERSTECKEN', 'TIRE SUR LES ASTÉROÏDES - ILS PEUVENT CACHER DES CAISSES ET DES BONUS', 'SPARA AGLI ASTEROIDI - POSSONO NASCONDERE CASSE E BONUS', 'ATIRE NOS ASTEROIDES - ELES PODEM ESCONDER CAIXAS E BÔNUS', 'DISPARA A LOS ASTEROIDES - PUEDEN ESCONDER CAJAS Y BONUS', 'СТРЕЛЯЙ ПО АСТЕРОИДАМ - В НИХ БЫВАЮТ ЯЩИКИ И БОНУСЫ', 'ASTEROİTLERİ VUR - İÇLERİNDE KUTU VE BONUS OLABİLİR'],
+  'BEAT THE BOSS AT ROUND 5 TO UNLOCK A CHECKPOINT': ['BESIEGE DEN BOSS IN RUNDE 5 FÜR EINEN CHECKPOINT', 'BATS LE BOSS DE LA MANCHE 5 POUR DÉBLOQUER UN CHECKPOINT', 'BATTI IL BOSS DEL ROUND 5 PER SBLOCCARE UN CHECKPOINT', 'VENÇA O CHEFE DA RODADA 5 PARA LIBERAR UM CHECKPOINT', 'DERROTA AL JEFE DE LA RONDA 5 PARA DESBLOQUEAR UN CHECKPOINT', 'ПОБЕДИ БОССА В РАУНДЕ 5, ЧТОБЫ ОТКРЫТЬ ЧЕКПОИНТ', '5. TURDAKİ BOSSU YEN VE CHECKPOINT AÇ'],
+  'KEEP MOVING - THE MINES HUNT YOU': ['BLEIB IN BEWEGUNG - DIE MINEN JAGEN DICH', 'BOUGE SANS ARRÊT - LES MINES TE TRAQUENT', 'NON FERMARTI - LE MINE TI DANNO LA CACCIA', 'NÃO PARE - AS MINAS CAÇAM VOCÊ', 'NO TE QUEDES QUIETO - LAS MINAS TE PERSIGUEN', 'НЕ СТОЙ НА МЕСТЕ - МИНЫ ОХОТЯТСЯ ЗА ТОБОЙ', 'HAREKET ETMEYE DEVAM ET - MAYINLAR SENİ AVLIYOR'],
+  'SPEND YOUR COINS IN THE SHOP ON NEW WEAPONS': ['GIB DEINE MÜNZEN IM SHOP FÜR NEUE WAFFEN AUS', 'DÉPENSE TES PIÈCES EN NOUVELLES ARMES DANS LA BOUTIQUE', 'SPENDI LE MONETE NEL NEGOZIO PER NUOVE ARMI', 'GASTE SUAS MOEDAS EM NOVAS ARMAS NA LOJA', 'GASTA TUS MONEDAS EN ARMAS NUEVAS EN LA TIENDA', 'ТРАТЬ МОНЕТЫ В МАГАЗИНЕ НА НОВОЕ ОРУЖИЕ', 'PARANI MAĞAZADA YENİ SİLAHLARA HARCA'],
   'WATCH AN AD': ['WERBUNG ANSEHEN', 'REGARDER UNE PUB', 'GUARDA UN ANNUNCIO', 'ASSISTA A UM ANÚNCIO', 'VER UN ANUNCIO', 'СМОТРЕТЬ РЕКЛАМУ', 'REKLAM İZLE'],
   'VICTORY': ['SIEG', 'VICTOIRE', 'VITTORIA', 'VITÓRIA', 'VICTORIA', 'ПОБЕДА', 'ZAFER'],
   'THE @ IS DESTROYED - @ CLEARED': ['DAS @ IST ZERSTÖRT - @ GESCHAFFT', 'LE @ EST DÉTRUIT - @ TERMINÉ', 'IL @ È DISTRUTTO - @ COMPLETATO', 'O @ FOI DESTRUÍDO - @ CONCLUÍDO', 'EL @ HA SIDO DESTRUIDO - @ SUPERADO', '@ УНИЧТОЖЕНО - @ ПРОЙДЕН', '@ YOK EDİLDİ - @ TAMAMLANDI'],
@@ -4642,8 +4656,12 @@ function onWaveStart() {
   run.maxWave = Math.max(run.maxWave, wave);
   if (isBossWave(wave)) run.bossSnap = snapshot(); else run.waveSnap = snapshot();
 }
-let freeRun = true;   // 19/10: the first run of a session starts without an ad (new players were leaving right there)
-function adStart(go) { go(); if (tut) return; if (freeRun) { freeRun = false; return; } ADS.breakAd(); }   // 19/10: a new run starts behind an ad break (see ADS.breakAd)
+let freeRun = true;   // 19/10: the first run of a session started without an ad (no run starts behind an ad since 23/10; kept for the tutorial end)
+// 23/10 (user's choice): no ad at GAME OVER and never for a run started from the menu. The ad break comes when you go back into
+// a run from GAME OVER (PLAY AGAIN, checkpoint, RETRY BOSS), from the victory screen or with a restart from the pause,
+// except the first retry after the first death of each session; the breaks after the bosses and the rewarded videos stay
+let firstDeathFree = true, retryFree = false;
+function adStart(go) { const from = state; go(); if (tut || from === 'title') return; if (from === 'over' && retryFree) { retryFree = false; return; } ADS.breakAd(); }
 function startRun(d, from, resume) {
   if (!bootReady) return;
   tut = null;
@@ -6345,6 +6363,12 @@ function drawShopTut() {
 /* 'RETRIES 2  -19%' when RETRY BOSS was used in this run (empty otherwise) */
 function retryNote() { if (!run || !run.retries) return ''; return '   RETRIES ' + run.retries + '  -' + Math.round((1 - Math.pow(0.9, run.retries)) * 100) + '%'; }
 /* game over: what you earned, and how to carry on */
+/* 23/10: tips on the GAME OVER screen, one per death, in turn (the checkpoint one only until there is a checkpoint) */
+const TIPS = ['GRAB A CRATE OF YOUR OWN WEAPON TO LEVEL IT UP', 'YOUR ULTIMATE CHARGES AS YOU FIGHT - USE IT ON A CROWD', 'SHOOT THE ASTEROIDS - THEY CAN HIDE CRATES AND BONUSES',
+  'BEAT THE BOSS AT ROUND 5 TO UNLOCK A CHECKPOINT', 'KEEP MOVING - THE MINES HUNT YOU', 'SPEND YOUR COINS IN THE SHOP ON NEW WEAPONS'];
+let tipK = -1;
+function nextTip(k) { for (let i = 1; i <= TIPS.length; i++) { const j = (k + i + TIPS.length) % TIPS.length; if (j === 3 && (profile.cp[diffIdx] || 0) > 0) continue; return j; } return 0; }
+const freeWeaponWaiting = () => !profile.shopTutDone && hasPlayed() && !tut && WEAPON_SHOP.some(w => w.price > 0 && !profile.owned['w_' + w.id]);
 function drawOverScreen() {
   dim(0.74);
   const ts = Math.min(VW * 0.85 / 9, RS * 1.8 / 9, VH * 0.09, 64), y1 = safe.t + Math.max(FS * 3, VH * 0.13);
@@ -6362,8 +6386,11 @@ function drawOverScreen() {
     const cp = profile.cp[diffIdx] || 0;
     if (cp > 0 && wave > cp + 1 && !bossNow) opts.push(['ROUND ' + (cp + 1), C.uiMag, () => adStart(() => startRun(diffIdx, cp + 1)), 'CHECKPOINT']);
     opts.push(['PLAY AGAIN', C.cyan, () => adStart(() => startRun(diffIdx, 1)), 'FROM ROUND 1']);
-    opts.push(['MENU', C.uiBlue, () => { ADS.interstitial(); toMenu(); }, '']);
+    if (freeWeaponWaiting()) opts.push(['FREE WEAPON', C.yel, () => { toMenu(); menu.screen = 'shop'; }, 'IN THE SHOP']);   // 23/10: straight into the shop tour (it gives the first new weapon)
+    opts.push(['MENU', C.uiBlue, () => toMenu(), '']);   // 23/10: no ad on the way to the menu (a run started from the menu has none either)
     drawOptionRow(opts, VH - safe.b - UI.h() - FS * 1.6);
+    const tip = TIPS[tipK] || '';   // 23/10: one tip per death (what the short start no longer teaches)
+    if (tip) uiInfo(tip, CX, VH - safe.b - UI.h() - FS * 2.6, C.white, { size: Math.max(9, FS * 0.62), maxW: availW * 0.92, alpha: 0.7 * Math.min(1, (stateT - 0.8) * 3), track: 0.12 });
   }
   drawMenuFs();
 }
