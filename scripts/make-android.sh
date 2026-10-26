@@ -87,7 +87,12 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.google.android.gms.games.GamesSignInClient;
+import com.google.android.gms.games.LeaderboardsClient;
 import com.google.android.gms.games.PlayGames;
+import com.google.android.gms.games.leaderboard.LeaderboardScore;
+import com.google.android.gms.games.leaderboard.LeaderboardScoreBuffer;
+import com.google.android.gms.games.leaderboard.LeaderboardVariant;
+import com.getcapacitor.JSArray;
 
 @CapacitorPlugin(name = "PlayGames")
 public class PlayGamesPlugin extends Plugin {
@@ -100,10 +105,58 @@ public class PlayGamesPlugin extends Plugin {
     });
   }
 
-  private void done(PluginCall call, boolean ok) {
-    JSObject r = new JSObject();
-    r.put("signedIn", ok);
-    call.resolve(r);
+  private void done(final PluginCall call, final boolean ok) {
+    if (!ok) { JSObject r = new JSObject(); r.put("signedIn", false); call.resolve(r); return; }
+    PlayGames.getPlayersClient(getActivity()).getCurrentPlayer().addOnCompleteListener(t -> {
+      JSObject r = new JSObject();
+      r.put("signedIn", true);
+      if (t.isSuccessful() && t.getResult() != null) r.put("playerId", t.getResult().getPlayerId());
+      call.resolve(r);
+    });
+  }
+
+  private JSObject entry(LeaderboardScore sc) {
+    JSObject e = new JSObject();
+    e.put("rank", sc.getRank());
+    e.put("score", sc.getRawScore());
+    e.put("name", sc.getScoreHolderDisplayName());
+    if (sc.getScoreHolder() != null) e.put("id", sc.getScoreHolder().getPlayerId());
+    return e;
+  }
+
+  /* top 10 of the public board (all time) + the player's own score when it is not among them */
+  @PluginMethod
+  public void getScores(final PluginCall call) {
+    final String id = call.getString("id");
+    if (id == null) { call.reject("id mancante"); return; }
+    final LeaderboardsClient lc = PlayGames.getLeaderboardsClient(getActivity());
+    lc.loadTopScores(id, LeaderboardVariant.TIME_SPAN_ALL_TIME, LeaderboardVariant.COLLECTION_PUBLIC, 10)
+      .addOnSuccessListener(top -> {
+        final JSArray list = new JSArray();
+        final java.util.HashSet<Long> ranks = new java.util.HashSet<>();
+        try {
+          LeaderboardsClient.LeaderboardScores data = top.get();
+          if (data != null) {
+            LeaderboardScoreBuffer buf = data.getScores();
+            for (int i = 0; i < buf.getCount(); i++) { LeaderboardScore sc = buf.get(i); ranks.add(sc.getRank()); list.put(entry(sc)); }
+            buf.release();
+            data.release();
+          }
+        } catch (Exception ex) { }
+        lc.loadCurrentPlayerLeaderboardScore(id, LeaderboardVariant.TIME_SPAN_ALL_TIME, LeaderboardVariant.COLLECTION_PUBLIC)
+          .addOnCompleteListener(t2 -> {
+            try {
+              if (t2.isSuccessful() && t2.getResult() != null && t2.getResult().get() != null) {
+                LeaderboardScore mine = t2.getResult().get();
+                if (!ranks.contains(mine.getRank())) list.put(entry(mine));
+              }
+            } catch (Exception ex) { }
+            JSObject r = new JSObject();
+            r.put("entries", list);
+            call.resolve(r);
+          });
+      })
+      .addOnFailureListener(e -> call.reject("classifica non disponibile"));
   }
 
   @PluginMethod

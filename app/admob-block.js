@@ -66,10 +66,15 @@ const AM = (() => {
   am.shim = { EVENT_NAME: ev, advertisement: {
     on(e, f) { if (subs[e]) subs[e].add(f); }, off(e, f) { if (subs[e]) subs[e].delete(f); },
     showInterstitial() { show('inter'); }, showRewarded() { show('rew'); } },
-    leaderboards: G ? {   // the game shows its LEADERBOARD button for 'native_popup' and sends ranked scores with setScore
-      type: 'native_popup',
+    player: { id: null },
+    leaderboards: G ? {   // in-game screen (4 tabs, game's own UI) filled from Google Play Games: public board, all time
+      type: 'in_game',
       setScore(id, score) { const i = LBID[id]; if (i) try { G.submitScore({ id: i, score: Math.round(score) }).catch(() => {}); } catch (e) {} },
-      showNativePopup(id) { const i = LBID[id]; if (i) try { G.showLeaderboard({ id: i }).catch(() => {}); } catch (e) {} }
+      getEntries(id) {
+        const i = LBID[id];
+        if (!i) return Promise.reject(new Error('no board'));
+        return G.getScores({ id: i }).then(r => (r && r.entries) || []);
+      }
     } : undefined };
   /* at start-up: ask for consent when the region needs it (EEA / UK), then start the SDK and load the first ads */
   am.start = async () => {
@@ -87,7 +92,7 @@ const AM = (() => {
       dbg += am.canAds ? ' ADS OK' : ' NO ADS';
     } catch (e) { dbg = 'CONSENT ERROR ' + ((e && (e.message || e.code)) || e); }
     window.__consentDone = true;   // the splash can go
-    if (G) { try { G.signIn().catch(() => {}); } catch (e) {} }   // Play Games sign-in (silent when the player already has a profile)
+    if (G) { try { G.signIn().then(r => { if (r && r.playerId && am.shim) am.shim.player.id = r.playerId; }).catch(() => {}); } catch (e) {} }   // Play Games sign-in (silent when the player already has a profile)
     if (!am.canAds) return;
     try { await P.initialize({}); } catch (e) { am.canAds = false; return; }
     load('inter'); load('rew');
